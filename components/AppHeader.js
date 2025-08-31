@@ -49,7 +49,7 @@ export default function AppHeader() {
         gap: 8,
       }}
     >
-      <div style={{ color: "#fff", fontWeight: 600, marginRight: 12 }}>CMS</div>
+      <div style={{ color: "#fff", fontWeight: 600, marginRight: 12 }}>Shree Ram</div>
       <Menu
         theme="dark"
         mode="horizontal"

@@ -27,6 +27,9 @@ import api from "@/lib/axios";
 import Protected from "@/components/Protected";
 import { ApiRoute, Pagination } from "@/lib/enums";
 import { formatDate, fromNow } from "@/utils/formatDate";
+import JobForm from "@/components/JobForm";
+import { addJob, updateJob } from "@/lib/jobs";
+import { toastSuccess } from "@/lib/toast";
 
 const { Content } = Layout;
 const { Title } = Typography;
@@ -96,6 +99,12 @@ export default function JobsPage() {
   const [search, setSearch] = useState("");
 
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
+
+  // Form state
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState("add");
+  const [formInitial, setFormInitial] = useState(null);
+  const [confirming, setConfirming] = useState(false);
 
   const columns = useMemo(() => {
     return [
@@ -220,6 +229,55 @@ export default function JobsPage() {
     applyFilter(value);
   };
 
+  // Open add/edit
+  const openAddForm = () => {
+    setFormMode("add");
+    setFormInitial(null);
+    setFormOpen(true);
+  };
+  const openEditForm = (record) => {
+    setFormMode("edit");
+    setFormInitial(record);
+    setFormOpen(true);
+  };
+
+  // Optimistic patch for add/update
+  const patchAllDataUpsert = (item) => {
+    setAllData((prev) => {
+      const idx = prev.findIndex((r) => r.id === item.id);
+      let next;
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = { ...prev[idx], ...item };
+      } else {
+        next = [item, ...prev];
+      }
+      applyFilter(search, next);
+      return next;
+    });
+  };
+
+  const handleFormSubmit = async (values, mode, id) => {
+    setConfirming(true);
+    try {
+      if (mode === "edit" && id) {
+        const updated = await updateJob(id, values);
+        patchAllDataUpsert(updated ?? { id, ...values });
+        toastSuccess("Job updated");
+      } else {
+        const created = await addJob(values);
+        const item = created?.id
+          ? created
+          : { ...values, id: crypto.randomUUID?.() || String(Date.now()) };
+        patchAllDataUpsert(item);
+        toastSuccess("Job added");
+      }
+      setFormOpen(false);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   return (
     <Protected>
       <Layout>
@@ -230,7 +288,11 @@ export default function JobsPage() {
               <Title level={4} style={{ margin: 0 }}>
                 Jobs
               </Title>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => {}}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={openAddForm}
+              >
                 Add Job
               </Button>
             </Flex>
@@ -255,23 +317,38 @@ export default function JobsPage() {
               dataSource={filtered}
               expandable={{
                 expandedRowRender: (r) => (
-                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
-                    <Descriptions size="small" bordered column={2} labelStyle={{ width: 180 }}>
+                  <Space
+                    direction="vertical"
+                    size="small"
+                    style={{ width: "100%" }}
+                  >
+                    <Descriptions
+                      size="small"
+                      bordered
+                      column={2}
+                      labelStyle={{ width: 180 }}
+                    >
                       <Descriptions.Item label="Title" span={2}>
                         {r.title}
                       </Descriptions.Item>
                       <Descriptions.Item label="Category">
-                        <Tag color={categoryColor(r.category)}>{r.category}</Tag>
+                        <Tag color={categoryColor(r.category)}>
+                          {r.category}
+                        </Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Status">
                         <Tag color={statusColor(r.status)}>{r.status}</Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Priority">
-                        <Tag color={priorityColor(r.priority)}>{r.priority}</Tag>
+                        <Tag color={priorityColor(r.priority)}>
+                          {r.priority}
+                        </Tag>
                       </Descriptions.Item>
                       <Descriptions.Item label="Scheduled At" span={2}>
                         {r.scheduledAt
-                          ? `${formatDate(r.scheduledAt)} (${fromNow(r.scheduledAt)})`
+                          ? `${formatDate(r.scheduledAt)} (${fromNow(
+                              r.scheduledAt
+                            )})`
                           : "-"}
                       </Descriptions.Item>
 
@@ -305,12 +382,16 @@ export default function JobsPage() {
 
                       <Descriptions.Item label="Created At">
                         {r.createdAt
-                          ? `${formatDate(r.createdAt)} (${fromNow(r.createdAt)})`
+                          ? `${formatDate(r.createdAt)} (${fromNow(
+                              r.createdAt
+                            )})`
                           : "-"}
                       </Descriptions.Item>
                       <Descriptions.Item label="Updated At">
                         {r.updatedAt
-                          ? `${formatDate(r.updatedAt)} (${fromNow(r.updatedAt)})`
+                          ? `${formatDate(r.updatedAt)} (${fromNow(
+                              r.updatedAt
+                            )})`
                           : "-"}
                       </Descriptions.Item>
 
@@ -319,7 +400,10 @@ export default function JobsPage() {
                       </Descriptions.Item>
                     </Descriptions>
 
-                    <Button icon={<EditOutlined />} onClick={() => {}}>
+                    <Button
+                      icon={<EditOutlined />}
+                      onClick={() => openEditForm(r)}
+                    >
                       Edit
                     </Button>
                   </Space>
@@ -338,6 +422,15 @@ export default function JobsPage() {
           </Space>
         </Content>
       </Layout>
+
+      <JobForm
+        open={formOpen}
+        onCancel={() => setFormOpen(false)}
+        onSubmit={handleFormSubmit}
+        mode={formMode}
+        initialValues={formInitial}
+        confirming={confirming}
+      />
     </Protected>
   );
 }
