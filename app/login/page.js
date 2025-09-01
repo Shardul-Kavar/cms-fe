@@ -1,7 +1,7 @@
-// app/login/page.js (use toast on success/failure)
+// app/login/page.js
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import { Button, Card, Form, Input, Typography } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
@@ -9,16 +9,15 @@ import { toastSuccess } from "@/lib/toast";
 import { ApiRoute, CookieName } from "@/lib/enums";
 import { setCookie } from "@/lib/cookies-client";
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useSearchParams(); // now safely inside a Suspense child
   const [loading, setLoading] = useState(false);
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
       const res = await api.post(`${ApiRoute.USER}/login`, values);
-      console.log("🚀 ~ onFinish ~ res:", res);
       const token = res.data?.token;
       if (!token) throw new Error("No token returned");
 
@@ -28,8 +27,6 @@ export default function LoginPage() {
       toastSuccess("Logged in successfully");
       const from = params.get("from") || "/customers";
       router.replace(from);
-    } catch (e) {
-      console.log("🚀 ~ onFinish ~ e:", e);
     } finally {
       setLoading(false);
     }
@@ -68,5 +65,17 @@ export default function LoginPage() {
         </Form>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ textAlign: "center", padding: 24 }}>Loading...</div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   );
 }
